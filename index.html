@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>記單程序</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 600px;
+            margin: auto;
+        }
+        .category, .product {
+            margin-bottom: 10px;
+        }
+        .product {
+            margin-left: 20px;
+        }
+        .total {
+            margin-top: 20px;
+            font-size: 1.2em;
+        }
+        button {
+            padding: 10px 20px;
+            margin-top: 10px;
+        }
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            .product label, .product input {
+                display: block;
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>記單程序</h1>
+    <button id="addOrder">新增訂單</button>
+    <div id="categoriesContainer"></div>
+    <div class="total">
+        <strong>總金額: $<span id="totalAmount">0</span></strong>
+    </div>
+    <button id="completeOrder" style="display:none;">結單</button>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script>
+        const categories = {
+            '義大利麵': ['野菇蔬菜義大利麵', '鄉村烤雞腿義大利麵', '義式蛤蠣義大利麵', '義式海鮮義大利麵', '炭烤大魷魚義大利麵'],
+            '炸雞': ['韓式辣醬炸雞', '超濃起司炸雞', '蒜香炸雞', 'BBQ炸雞', '泰式酸辣炸雞', '巧克力炸雞', '蜂蜜芥末炸雞'],
+            '炸物': ['大魷魚', '月亮蝦餅', '甜不辣(魚薯薯)', '雞米花', '薯條', '洋蔥圈'],
+            '今日岬苦': ['美式咖啡', '溫室拿鐵', '焦糖拿鐵', '榛果拿鐵', '溫室薰衣草拿鐵', '溫室玫瑰拿鐵'],
+            '岬茶': ['玫瑰氣泡飲', '莓果氣泡飲', '薰衣草氣泡飲', '冬瓜檸檬冰茶', '輕蘋香茶', '韓國柚子茶', '芒芒冰茶', '復刻梅果冰茶', '玫瑰茉莉花釀', '桂花烏梅釀', '悠閒塞納河', '美麗維納斯', '想瘦喝就對了'],
+            '家裡有牛': ['泰式奶茶', '朱古力牛牛', '抹茶牛牛', '草莓牛牛'],
+            '甜點': ['肉桂捲', '蜂蜜鬆餅', '巧克力鬆餅']
+        };
+
+        const prices = {
+            '野菇蔬菜義大利麵': 180,
+            '鄉村烤雞腿義大利麵': 220,
+            '義式蛤蠣義大利麵': 220,
+            '義式海鮮義大利麵': 230,
+            '炭烤大魷魚義大利麵': 250,
+            '韓式辣醬炸雞': 150,
+            '超濃起司炸雞': 150,
+            '蒜香炸雞': 150,
+            'BBQ炸雞': 150,
+            '泰式酸辣炸雞': 150,
+            '巧克力炸雞': 150,
+            '蜂蜜芥末炸雞': 150,
+            '大魷魚': 180,
+            '月亮蝦餅': 140,
+            '甜不辣(魚薯薯)': 60,
+            '雞米花': 80,
+            '薯條': 80,
+            '洋蔥圈': 80,
+            '美式咖啡': 90,
+            '溫室拿鐵': 100,
+            '焦糖拿鐵': 120,
+            '榛果拿鐵': 120,
+            '溫室薰衣草拿鐵': 120,
+            '溫室玫瑰拿鐵': 120,
+            '玫瑰氣泡飲': 100,
+            '莓果氣泡飲': 100,
+            '薰衣草氣泡飲': 100,
+            '冬瓜檸檬冰茶': 80,
+            '輕蘋香茶': 120,
+            '韓國柚子茶': 120,
+            '芒芒冰茶': 120,
+            '復刻梅果冰茶': 120,
+            '玫瑰茉莉花釀': 180,
+            '桂花烏梅釀': 180,
+            '悠閒塞納河': 180,
+            '美麗維納斯': 180,
+            '想瘦喝就對了': 180,
+            '泰式奶茶': 100,
+            '朱古力牛牛': 100,
+            '抹茶牛牛': 100,
+            '草莓牛牛': 130,
+            '肉桂捲': 120,
+            '蜂蜜鬆餅': 150,
+            '巧克力鬆餅': 150
+        };
+
+        document.getElementById('addOrder').addEventListener('click', () => {
+            document.getElementById('addOrder').style.display = 'none';
+            createCategoryOptions();
+            document.getElementById('completeOrder').style.display = 'block';
+        });
+
+        function createCategoryOptions() {
+            const container = document.getElementById('categoriesContainer');
+            container.innerHTML = '';
+            for (let category in categories) {
+                const div = document.createElement('div');
+                div.className = 'category';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = category;
+                checkbox.addEventListener('change', toggleProducts);
+
+                const label = document.createElement('label');
+                label.htmlFor = category;
+                label.textContent = category;
+
+                div.appendChild(checkbox);
+                div.appendChild(label);
+                container.appendChild(div);
+            }
+        }
+
+        function toggleProducts() {
+            const category = this.id;
+            const categoryDiv = this.parentElement;
+
+            if (this.checked) {
+                categories[category].forEach(product => {
+                    const productDiv = document.createElement('div');
+                    productDiv.className = 'product';
+
+                    const label = document.createElement('label');
+                    label.htmlFor = product;
+                    label.textContent = `${product} 單價: $${prices[product]}`;
+
+                    const quantity = document.createElement('input');
+                    quantity.type = 'number';
+                    quantity.id = product;
+                    quantity.value = 0;
+                    quantity.min = 0;
+                    quantity.style.marginLeft = '10px';
+                    quantity.addEventListener('input', calculateTotal);
+
+                    const amount = document.createElement('span');
+                    amount.className = 'amount';
+                    amount.textContent = ' $0';
+                    amount.style.marginLeft = '10px';
+
+                    productDiv.appendChild(label);
+                    productDiv.appendChild(quantity);
+                    productDiv.appendChild(amount);
+
+                    categoryDiv.appendChild(productDiv);
+                });
+            } else {
+                const products = categoryDiv.querySelectorAll('.product');
+                products.forEach(product => product.remove());
+            }
+
+            calculateTotal();
+        }
+
+        function calculateTotal() {
+            let total = 0;
+            document.querySelectorAll('.product').forEach(product => {
+                const quantity = product.querySelector('input[type="number"]');
+                const amount = product.querySelector('.amount');
+                const price = parseFloat(product.querySelector('label').textContent.match(/\$(\d+)/)[1]);
+
+                const productTotal = price * parseInt(quantity.value);
+                total += productTotal;
+                amount.textContent = ` $${productTotal}`;
+            });
+            document.getElementById('totalAmount').textContent = total;
+        }
+
+        function generateExcel() {
+            const data = [];
+            const now = new Date();
+            const date = now.toLocaleDateString();
+            const time = now.toLocaleTimeString();
+            const orderNumber = `訂單${Math.floor(Math.random() * 1000)}`;
+            const totalAmount = document.getElementById('totalAmount').textContent;
+
+            document.querySelectorAll('.product').forEach(product => {
+                const label = product.querySelector('label').textContent.split(' 單價: ')[0];
+                const quantity = product.querySelector('input[type="number"]').value;
+                const price = product.querySelector('label').textContent.match(/\$(\d+)/)[1];
+                const amount = product.querySelector('.amount').textContent.trim().replace('$', '');
+                data.push([date, time, orderNumber, label, quantity, price, amount]);
+            });
+
+            data.push(['總金額', '', '', '', '', totalAmount]);
+
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '記單');
+
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            saveAs(new Blob([wbout], { type: "application/octet-stream" }), '記單.xlsx');
+        }
+
+        document.getElementById('completeOrder').addEventListener('click', generateExcel);
+    </script>
+</body>
+</html>
